@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
+const { json } = require("express");
 
 const prisma = new PrismaClient();
 
@@ -10,7 +11,7 @@ exports.signup = async (req, res) => {
 
     const exixtsingUser = await prisma.user.findUnique({ where: { email } });
     if (exixtsingUser) {
-      res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     const hashPassword = await bcrypt.hash(password, 10);
@@ -25,7 +26,7 @@ exports.signup = async (req, res) => {
     res.status(201).json({ message: "User created successfully", user });
   } catch (error) {
     console.log("An unexpected error occurred:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -35,12 +36,12 @@ exports.login = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      res.status(401).json({ message: "User not found" });
+      return res.status(401).json({ message: "User not found" });
     }
 
-    const isMatch = bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      res.status(401).json({ message: "invalid credits" });
+      return res.status(401).json({ message: "invalid credits" });
     }
 
     const token = jwt.sign(
@@ -49,9 +50,23 @@ exports.login = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.status(200).json({ token });
+    res.status(200).json({ token: token, user: user });
   } catch (error) {
     console.log("An errored while sign in: " + error.message);
-    res.status(501).json({ message: "An internal server occured" });
+    return res.status(501).json({ message: "An internal server occured" });
   }
+};
+
+exports.getProfile = async (req, res) => {
+  const user = req.user;
+
+  res.json({
+    message: "user profile loaded",
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
 };
